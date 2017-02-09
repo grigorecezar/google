@@ -1,8 +1,6 @@
-<?php
+<?php namespace Index\Google;
 
-namespace League\Skeleton;
-
-class SkeletonClass
+class AbstractGoogle
 {
 
     /**
