@@ -33,3 +33,7 @@ build
 composer.lock
 docs
 vendor
+
+Index-Prod-9eafa0a2cf39.json
+app_credentials.json
+tests/TestEnv.php
