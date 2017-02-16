@@ -1,6 +1,13 @@
 <?php namespace Index\Google;
 
 use Google_Service_Gmail;
+use Google_Service_Exception;
+
+
+use Google_Service_Gmail_WatchRequest;
+
+use Google\Cloud\PubSub\PubSubClient;
+use Google\Cloud\Exception\NotFoundException;
 
 class Gmail extends AbstractGoogle
 {
@@ -102,5 +109,242 @@ class Gmail extends AbstractGoogle
 		}
 
 		return $ids;
+	}
+
+	public function createTopic($projectId, $topicName)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId
+		]);
+
+		$topic = $pubsub->createTopic($topicName);
+
+		return $topic;
+	}
+
+	function createSubscription($projectId, $topicName, $subscriptionName, $pushUrl = null)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		$topic = $pubsub->topic($topicName);
+		if(!$topic){
+			return null;
+		}
+		try {
+			$topicInfo = $topic->info();
+		} catch(NotFoundException $e){
+			return null;
+		}
+
+		$subscription = $topic->subscription($subscriptionName);
+
+		if($pushUrl){
+			// create push notification
+			$subscription->create([
+				'endpoint' => $pushUrl
+			]);
+		} else {
+			// create pull notification
+			$subscription->create();
+		}
+
+		return $subscription;
+	}
+
+	function getTopic($projectId, $topicName)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		$topic = $pubsub->topic($topicName);
+		if(!$topic){
+			return null;
+		}
+		try {
+			$topicInfo = $topic->info();
+		} catch(NotFoundException $e){
+			return null;
+		}
+
+		return $topic;
+	}
+
+	function getSubscription($projectId, $topicName, $subscriptionName)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		$topic = $pubsub->topic($topicName);
+		if(!$topic){
+			return null;
+		}
+		try {
+			$topicInfo = $topic->info();
+		} catch(NotFoundException $e){
+			return null;
+		}
+
+		$subscription = $topic->subscription($subscriptionName);
+		if(!$subscription){
+			return null;
+		}
+
+		try {
+			$subscriptionInfo = $subscription->info();
+		} catch(NotFoundException $e){
+			return null;
+		}
+
+		return $subscription;
+	}
+
+	function listTopics($projectId)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		try {
+			$topics = [];
+			foreach ($pubsub->topics() as $topic) {
+				$topics[] = $topic;
+			}
+		} catch(\Exception $e){
+			return [];
+		}
+
+		return $topics;
+	}
+
+	function listSubscriptions($projectId)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		try {
+			$subscriptions = [];
+			foreach ($pubsub->subscriptions() as $subscription) {
+				$subscriptions[] = $subscription;
+			}
+		} catch(\Exception $e){
+			return [];
+		}
+
+		return $subscriptions;
+	}
+
+	function deleteTopic($projectId, $topicName)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		$topic = $pubsub->topic($topicName);
+		if(!$topic){
+			return;
+		}
+
+		try {
+			$info = $topic->info();
+		} catch(NotFoundException $e){
+			return;
+		}
+
+		$topic->delete();
+	}
+
+	function deleteSubscription($projectId, $subscriptionName)
+	{
+		$pubsub = new PubSubClient([
+			'projectId' => $projectId,
+		]);
+
+		$subscription = $pubsub->subscription($subscriptionName);
+		if(!$subscription){
+			return;
+		}
+
+		try {
+			$info = $subscription->info();
+		} catch(NotFoundException $e){
+			return;
+		}
+
+		$subscription->delete();
+	}
+
+	function modifyPushConfig($projectId, $topicName, $subscriptionName, $pushUrl = '')
+	{
+		$subscription = $this->getSubscription($projectId, $topicName, $subscriptionName);
+		if(!$subscription){
+			return;
+		}
+
+		$subscription->modifyPushConfig([
+			'pushEndpoint' => $pushUrl
+		]);
+	}
+
+	public function watch($projectId, $topicName)
+	{
+		$watchRequest = new Google_Service_Gmail_WatchRequest();
+		$watchRequest->setTopicName('projects/' . $projectId . '/topics/' . $topicName);
+		$watchRequest->setLabelIds(['UNREAD']);
+
+		$watchEvent = $this->getClient()->users->watch('me', $watchRequest);
+
+		return $watchEvent;
+	}
+
+	public function stopWatch()
+	{
+		$this->getClient()->users->stop('me');
+	}
+
+	public function getLastMessage($historyId)
+	{
+		try {
+			$realMessage = null;
+
+			// we only look at the UNREAD labels
+			$params = [
+				'startHistoryId' => $historyId,
+				'labelId' => 'UNREAD'
+			];
+
+			$gmailHistory = $this->getClient()->users_history->listUsersHistory('me', $params);
+			$history = $gmailHistory->getHistory();
+
+			$historyCount = count($history);
+			if($historyCount < 1){
+				return null;
+			}
+
+			// take the last history item, the last history change
+			$lastHistoryItem = $history[$historyCount - 1];
+
+			$messagesCount = count($lastHistoryItem->getMessages());
+			if($messagesCount < 1){
+				return null;
+			}
+
+			// take the last message from the last history change
+			$lastMessage = $lastHistoryItem->getMessages()[$messagesCount - 1];
+
+			$realMessage = $this->getClient()->users_messages->get('me', $lastMessage->getId(), [
+				'format' => 'FULL',
+				'metadataHeaders' => ['From', 'To', 'Cc', 'Bcc', 'Date']
+			]);
+
+			return $realMessage;
+
+		} catch(Google_Service_Exception $e){
+			return null;
+		}
 	}
 }
