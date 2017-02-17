@@ -1,4 +1,4 @@
-<?php namespace Index\Google;
+<?php namespace IndexIO\Google;
 
 // ENUM: should extend a enum class
 class Permissions

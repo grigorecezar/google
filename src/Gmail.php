@@ -1,8 +1,7 @@
-<?php namespace Index\Google;
+<?php namespace IndexIO\Google;
 
 use Google_Service_Gmail;
 use Google_Service_Exception;
-
 
 use Google_Service_Gmail_WatchRequest;
 
@@ -18,6 +17,116 @@ class Gmail extends AbstractGoogle
 	protected function setClient()
 	{
 		$this->client = new Google_Service_Gmail($this->getGoogleClient());
+	}
+
+	/**
+	 * Returns an email from google by id in a specific format
+	 *
+	 * @param gmessage_id retrieved from google
+	 * @param EMAIL_FORMAT found as constants in this class - e types: meta-raw, meta-full, full
+	 */
+	public function getEmailById($id, $format = EmailFormatEnum::META_RAW)
+	{
+		switch ($format) {
+			case EmailFormatEnum::META_RAW:
+				$options = [
+					'format' => 'metadata',
+					'metadataHeaders' => ['From', 'To', 'Cc', 'Bcc', 'Date']
+				];
+				break;
+
+			case EmailFormatEnum::META_FULL:
+				$options = [
+					'format' => 'metadata'
+				];
+				break;
+
+			case EmailFormatEnum::FULL:
+				$options = [
+					'format' => 'full'
+				];
+				break;
+
+			default:
+				throw new GoogleException('The format provided does not exist.');
+		}
+
+		return new Email($this->getClient()->users_messages->get('me', $id, $options), $format);
+	}
+
+	/**
+	 * Ability to pull emails from the gmail account associated in a specific format.
+	 * The method will return an array of Email object. You can pass an interval (start date, end date)
+	 * for which to pull the emails with a max results. 
+	 * Eg. if you want to extract emails from my account between January and March 2017
+	 * pass start date as 1 January, end date 30 March
+	 *
+	 * @param Carbon\Carbon $startDate
+	 * @param Carbon\Carbon $endDate
+	 * @param int $maxResults
+	 * @param IndexIO\Google\EmailFormatEnum $format
+	 * @return array(IndexIO\Google\Email) 
+	 */
+	public function getEmails($maxResults, $format = EmailFormatEnum::META_RAW)
+	{
+		$params = $this->formatParamsForEmailPulling(null, null, $maxResults);
+
+		$pageToken = null;
+		$emails = [];
+		$countProcessedEmails = 0;
+		do {
+			try {
+				if ($pageToken) {
+					$params['pageToken'] = $pageToken;
+				}
+
+				list($newEmailsSet, $pageToken) = $this->getEmailsAndNextToken($params, $countProcessedEmails, $format);
+				$emails = array_merge($emails, $newEmailsSet);
+
+			} catch(Google_Auth_Exception $e){
+				throw $e;
+			} catch (Exception $e) {
+				$errors ++;
+			}
+		} while ($pageToken && $countProcessedEmails > 0 && $countProcessedEmails < $maxResults);
+
+		return $emails;
+	}
+
+	private function formatParamsForEmailPulling($startDate = null, $endDate = null, $maxResults = null)
+	{
+		// if max results is not set pull all emails
+		// be aware of memory restraints of your machine if using
+		if($maxResults === null) {
+			$maxResults = 100000000;
+		}
+
+		$params = [
+			'q' => ' -in:chats ',
+			'maxResults' => $maxResults
+		];
+
+		return $params;
+	}
+
+	private function getEmailsAndNextToken($params, &$countProcessedEmails)
+	{
+		$messagesResponse = $this->getClient()->users_messages->listUsersMessages('me', $params);
+		if(! $messagesResponse->getMessages()) {
+			return [[], null];
+		}
+
+		foreach ($messagesResponse->getMessages() as $message) {
+			$emails[] = $this->getEmailById($message->getId(), EmailFormatEnum::META_RAW);
+
+			$countProcessedEmails ++;
+			if($countProcessedEmails === $params['maxResults']) {
+				return [$emails, null];
+			}
+		}
+
+		$pageToken = $messagesResponse->getNextPageToken();
+		return [$emails, $pageToken];
 	}
 
 	public function getMessagesIds($startDate = null, $endDate = null, $to = [], $from = [], $maxResults = 2500) 
@@ -79,6 +188,7 @@ class Gmail extends AbstractGoogle
 
 				if ($messagesResponse->getMessages()) {
 					foreach ($messagesResponse->getMessages() as $message) {
+						echo $countTotalMessages . ') ' . 'Message id: ' . $message->getId() . "\n";
 						$ids[] = $message->getId();
 						$countTotalMessages ++;
 						if($countTotalMessages === $maxResults) {
@@ -346,5 +456,36 @@ class Gmail extends AbstractGoogle
 		} catch(Google_Service_Exception $e){
 			return null;
 		}
+	}
+
+	/**
+	 * @param [] the gmail messages coming from google
+	 * @return Expected format back:
+	 * [
+	 *		'from' => null,
+	 *		'to' => [],
+	 *		'cc' => [],
+	 *		'bcc' => [],
+	 *		'gmessage_id' => null,
+	 *		'subject' => null,
+	 *		'snippet' => null,
+	 *		'body' => null,
+	 *		'date' => null
+	 *	];
+	 */
+	private function formatGmailMessagesToEmails($messages)
+	{
+		$emails = [];
+
+		// lets start looping through the messages and format them
+		foreach ($messages as $message) {
+			if($value instanceof Google_Service_Exception) {
+				continue;
+			}
+
+			$emails[] = new Email($message);
+		}
+
+		return $emails;
 	}
 }

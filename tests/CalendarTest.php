@@ -1,9 +1,9 @@
-<?php namespace Index\Google\Test;
+<?php namespace IndexIO\Google\Test;
 
 use PHPUnit_Framework_TestCase;
 
-use Index\Google\Calendar;
-use Index\Google\Google;
+use IndexIO\Google\Calendar;
+use IndexIO\Google\Google;
 
 class CalendarTest extends PHPUnit_Framework_TestCase
 {
@@ -12,15 +12,5 @@ class CalendarTest extends PHPUnit_Framework_TestCase
      */
     public function testTrueIsTrue()
     {
-    	$userToken = json_decode($userToken);
-    	
-    	$google = 
-    	$calendar = new Calendar($appCredentials, $userToken);
-    	$text = $calendar->getCalendarEvents();
-        
-        dd($text);
-        // $this->assertTrue(true);
-
-
     }
 }

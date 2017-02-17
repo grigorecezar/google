@@ -1,8 +1,8 @@
-<?php namespace Index\Google\Test;
+<?php namespace IndexIO\Google\Test;
 
 use PHPUnit_Framework_TestCase;
 
-use Index\Google\Google;
+use IndexIO\Google\Google;
 
 class GoogleTest extends PHPUnit_Framework_TestCase
 {
@@ -14,7 +14,7 @@ class GoogleTest extends PHPUnit_Framework_TestCase
     	$google = Google::createForIndividualAccess($appCredentials);
         $calendar = $google->createCalendar($userAccessToken);
 
-        $this->assertInstanceOf('Index\\Google\\Calendar', $calendar);
+        $this->assertInstanceOf('IndexIO\\Google\\Calendar', $calendar);
     }
 
     public function testCalendarCreationForDomainAccess()
@@ -25,7 +25,7 @@ class GoogleTest extends PHPUnit_Framework_TestCase
         $google = Google::createForDomainWideAccess($appCredentials);
         $calendar = $google->createCalendar($userEmailToken);
 
-        $this->assertInstanceOf('Index\\Google\\Calendar', $calendar);
+        $this->assertInstanceOf('IndexIO\\Google\\Calendar', $calendar);
     }
 
     public function testGmailCreationForIndividualAccess()
@@ -36,7 +36,7 @@ class GoogleTest extends PHPUnit_Framework_TestCase
         $google = Google::createForIndividualAccess($appCredentials);
         $gmail = $google->createGmail($userAccessToken);
 
-        $this->assertInstanceOf('Index\\Google\\Gmail', $gmail);
+        $this->assertInstanceOf('IndexIO\\Google\\Gmail', $gmail);
     }
 
     public function testGmailCreationForDomainAccess()
@@ -47,6 +47,6 @@ class GoogleTest extends PHPUnit_Framework_TestCase
         $google = Google::createForDomainWideAccess($appCredentials);
         $gmail = $google->createGmail($userEmailToken);
 
-        $this->assertInstanceOf('Index\\Google\\Gmail', $gmail);
+        $this->assertInstanceOf('IndexIO\\Google\\Gmail', $gmail);
     }
 }

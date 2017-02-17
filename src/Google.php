@@ -1,4 +1,4 @@
-<?php namespace Index\Google;
+<?php namespace IndexIO\Google;
 
 /**
  * Interacting point with google calendar and gmail wrappers.

@@ -1,4 +1,4 @@
-<?php namespace Index\Google;
+<?php namespace IndexIO\Google;
 
 use Google_Client;
 use Google_Auth_AssertionCredentials;

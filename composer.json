@@ -1,5 +1,5 @@
 {
-    "name": "index/google",
+    "name": "index-io/google",
     "description": "This is the Index custom library for interacting with Google gmail and calendar api.",
     "keywords": [
         "index",
@@ -33,19 +33,20 @@
         "php" : ">=7.0.0",
         "google/apiclient": "2.*",
         "google/cloud": "^0.20.1",
-        "larapack/dd": "1.*"
+        "larapack/dd": "1.*",
+        "nesbot/carbon": "1.21.0"
     },
     "require-dev": {
         "phpunit/phpunit" : "4.*"
     },
     "autoload": {
         "psr-4": {
-            "Index\\Google\\": "src"
+            "IndexIO\\Google\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Index\\Google\\Test\\": "tests"
+            "IndexIO\\Google\\Test\\": "tests"
         }
     },
     "extra": {
