@@ -8,6 +8,8 @@ use Google_Service_Gmail_WatchRequest;
 use Google\Cloud\PubSub\PubSubClient;
 use Google\Cloud\Exception\NotFoundException;
 
+use Carbon\Carbon;
+
 class Gmail extends AbstractGoogle
 {
 	const PERMISSIONS = [
@@ -25,7 +27,7 @@ class Gmail extends AbstractGoogle
 	 * @param gmessage_id retrieved from google
 	 * @param EMAIL_FORMAT found as constants in this class - e types: meta-raw, meta-full, full
 	 */
-	public function getEmailById($id, $format = EmailFormatEnum::META_RAW)
+	public function getEmailById($id, $format = EmailFormatEnum::META_RAW) : Email
 	{
 		switch ($format) {
 			case EmailFormatEnum::META_RAW:
@@ -55,6 +57,31 @@ class Gmail extends AbstractGoogle
 	}
 
 	/**
+	 * Gets last $results emails associated with this account. Specific format can be requested
+	 * 
+	 * @param int $results
+	 * @param IndexIO\Google\EmailFormatEnum $format
+	 */
+	public function getLastEmails($results = 100, $format = EmailFormatEnum::META_RAW)
+	{
+		return $this->getEmails(null, null, $results, $format);
+	}
+
+	/**
+	 * Gets emails associated with this account in a specific time interval. 
+	 * The dates passed will be considered but only as days, eg. if startDate is
+	 * 2017/02/17 18:24:00 then the function will consider all the emails that have been
+	 * sent / received on the 2017/02/17 onwards, time is not being taken into consideration.
+	 *
+	 * @param int $results
+	 * @param IndexIO\Google\EmailFormatEnum $format
+	 */
+	public function getEmailsInInterval(Carbon $startDate, Carbon $endDate = null, $format = EmailFormatEnum::META_RAW)
+	{
+		return $this->getEmails($startDate, $endDate, null, $format);
+	}
+
+	/**
 	 * Ability to pull emails from the gmail account associated in a specific format.
 	 * The method will return an array of Email object. You can pass an interval (start date, end date)
 	 * for which to pull the emails with a max results. 
@@ -67,9 +94,10 @@ class Gmail extends AbstractGoogle
 	 * @param IndexIO\Google\EmailFormatEnum $format
 	 * @return array(IndexIO\Google\Email) 
 	 */
-	public function getEmails($maxResults, $format = EmailFormatEnum::META_RAW)
+	protected function getEmails(Carbon $startDate = null, Carbon $endDate = null, 
+		$maxResults = null, $format = EmailFormatEnum::META_RAW)
 	{
-		$params = $this->formatParamsForEmailPulling(null, null, $maxResults);
+		$params = $this->formatParamsForEmailPulling($startDate, $endDate, $maxResults);
 
 		$pageToken = null;
 		$emails = [];
@@ -84,16 +112,16 @@ class Gmail extends AbstractGoogle
 				$emails = array_merge($emails, $newEmailsSet);
 
 			} catch(Google_Auth_Exception $e){
-				throw $e;
+				// TODO
 			} catch (Exception $e) {
-				$errors ++;
+				// TODO
 			}
 		} while ($pageToken && $countProcessedEmails > 0 && $countProcessedEmails < $maxResults);
 
 		return $emails;
 	}
 
-	private function formatParamsForEmailPulling($startDate = null, $endDate = null, $maxResults = null)
+	private function formatParamsForEmailPulling(Carbon $startDate = null, Carbon $endDate = null, $maxResults = null)
 	{
 		// if max results is not set pull all emails
 		// be aware of memory restraints of your machine if using
@@ -105,6 +133,16 @@ class Gmail extends AbstractGoogle
 			'q' => ' -in:chats ',
 			'maxResults' => $maxResults
 		];
+
+		// set start date; this has to be epoch; ie. after:2015/9/15; how to: date('Y/m/d', strtotime($startDate))
+		if($startDate) {
+			$params['q'] .= ' after:' . date('Y/m/d', strtotime($startDate)) . ' ';
+		}
+
+		// set end date; this has to be epoch; ie. after:2015/9/15; how to: date('Y/m/d', strtotime($endDate))
+		if($endDate) {
+			$params['q'] .= ' before:' . date('Y/m/d', strtotime($endDate)) . ' ';
+		}
 
 		return $params;
 	}
@@ -129,98 +167,6 @@ class Gmail extends AbstractGoogle
 		return [$emails, $pageToken];
 	}
 
-	public function getMessagesIds($startDate = null, $endDate = null, $to = [], $from = [], $maxResults = 2500) 
-	{
-		// TO label unread use:
-		/*
-		 $params['q'] .= 'label:Unread';
-		 or is:unread
-		 // if the labels contain a label called 'SENT' that means the email was sent from the user
-			if(is_numeric(array_search('SENT', $message->getLabelIds()))){
-				$data['direction'] = 'FROM';
-			}
-		*/
-		$params = [];
-		$params['q'] = '';
-		
-		// remove chat from messages
-		$params ['q'] .= ' -in:chats ';
-
-		// set start date; this has to be epoch; ie. after:2015/9/15; how to: date('Y/m/d', strtotime($startDate))
-		if($startDate) {
-			$params['q'] .= ' after:' . $startDate . ' ';
-		}
-
-		// set end date; this has to be epoch; ie. after:2015/9/15; how to: date('Y/m/d', strtotime($endDate))
-		if($endDate) {
-			$params['q'] .= ' before:' . $endDate . ' ';
-		}
-
-		
-		// the {} indicate that is to:liviu@index.io OR to:tom@index.io
-		// we add all the to OR the from
-		$params['q'] .= ' {';
-		foreach ($to as $value) {
-			$params['q'] .= ' to: ' . $value . ' ';
-		}
-		foreach ($from as $value) {
-			$params['q'] .= ' from:' . $value . ' ';
-		}
-		$params['q'] .= '} ';
-
-		if($maxResults && is_numeric($maxResults)){
-			$params['maxResults'] = $maxResults;
-		}
-
-		$pageToken = null;
-		$countMessages = 1;
-		$errors = 0;
-		$ids = [];
-		$countTotalMessages = 0;
-		do {
-			try {
-				if ($pageToken) {
-					$params['pageToken'] = $pageToken;
-				}
-				$messagesResponse = $this->getClient()->users_messages->listUsersMessages('me', $params);
-				
-				$countMessages = count($messagesResponse->getMessages());
-
-				if ($messagesResponse->getMessages()) {
-					foreach ($messagesResponse->getMessages() as $message) {
-						echo $countTotalMessages . ') ' . 'Message id: ' . $message->getId() . "\n";
-						$ids[] = $message->getId();
-						$countTotalMessages ++;
-						if($countTotalMessages === $maxResults) {
-							break;
-						}
-					}
-					$pageToken = $messagesResponse->getNextPageToken();
-				}
-			} catch(Google_Auth_Exception $e){
-				throw $e;
-			} catch (Exception $e) {
-				// echo 'An error occurred: ' . $e->getMessage() . "\n";
-				$errors ++;
-			}
-		} while ($pageToken && $countMessages > 0 && $countTotalMessages < $maxResults);
-		
-		$total = count($ids);
-		if($total === 0 && $errors === 0){
-			return $ids;
-		}elseif($total === 0){
-			throw new Exception('Too many errors, re-try later.', 500);
-		}
-
-		// we can afford an error rate lower than 1%
-		// if the total number of errors is bigger than 1 percent, re-try the task later
-		if( ($errors / $total) * 100 > 1) {
-			throw new Exception('Too many errors, re-try later.', 500);
-		}
-
-		return $ids;
-	}
-
 	public function createTopic($projectId, $topicName)
 	{
 		$pubsub = new PubSubClient([
@@ -232,7 +178,7 @@ class Gmail extends AbstractGoogle
 		return $topic;
 	}
 
-	function createSubscription($projectId, $topicName, $subscriptionName, $pushUrl = null)
+	public function createSubscription($projectId, $topicName, $subscriptionName, $pushUrl = null)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -263,7 +209,7 @@ class Gmail extends AbstractGoogle
 		return $subscription;
 	}
 
-	function getTopic($projectId, $topicName)
+	public function getTopic($projectId, $topicName)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -282,7 +228,7 @@ class Gmail extends AbstractGoogle
 		return $topic;
 	}
 
-	function getSubscription($projectId, $topicName, $subscriptionName)
+	public function getSubscription($projectId, $topicName, $subscriptionName)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -312,7 +258,7 @@ class Gmail extends AbstractGoogle
 		return $subscription;
 	}
 
-	function listTopics($projectId)
+	public function listTopics($projectId)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -330,7 +276,7 @@ class Gmail extends AbstractGoogle
 		return $topics;
 	}
 
-	function listSubscriptions($projectId)
+	public function listSubscriptions($projectId)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -348,7 +294,7 @@ class Gmail extends AbstractGoogle
 		return $subscriptions;
 	}
 
-	function deleteTopic($projectId, $topicName)
+	public function deleteTopic($projectId, $topicName)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -368,7 +314,7 @@ class Gmail extends AbstractGoogle
 		$topic->delete();
 	}
 
-	function deleteSubscription($projectId, $subscriptionName)
+	public function deleteSubscription($projectId, $subscriptionName)
 	{
 		$pubsub = new PubSubClient([
 			'projectId' => $projectId,
@@ -388,7 +334,7 @@ class Gmail extends AbstractGoogle
 		$subscription->delete();
 	}
 
-	function modifyPushConfig($projectId, $topicName, $subscriptionName, $pushUrl = '')
+	public function modifyPushConfig($projectId, $topicName, $subscriptionName, $pushUrl = '')
 	{
 		$subscription = $this->getSubscription($projectId, $topicName, $subscriptionName);
 		if(!$subscription){
@@ -456,36 +402,5 @@ class Gmail extends AbstractGoogle
 		} catch(Google_Service_Exception $e){
 			return null;
 		}
-	}
-
-	/**
-	 * @param [] the gmail messages coming from google
-	 * @return Expected format back:
-	 * [
-	 *		'from' => null,
-	 *		'to' => [],
-	 *		'cc' => [],
-	 *		'bcc' => [],
-	 *		'gmessage_id' => null,
-	 *		'subject' => null,
-	 *		'snippet' => null,
-	 *		'body' => null,
-	 *		'date' => null
-	 *	];
-	 */
-	private function formatGmailMessagesToEmails($messages)
-	{
-		$emails = [];
-
-		// lets start looping through the messages and format them
-		foreach ($messages as $message) {
-			if($value instanceof Google_Service_Exception) {
-				continue;
-			}
-
-			$emails[] = new Email($message);
-		}
-
-		return $emails;
 	}
 }

@@ -1,6 +1,7 @@
 <?php namespace IndexIO\Google;
 
 use Google_Service_Gmail_Message as GoogleServiceGmailMessage;
+use Carbon\Carbon;
 
 class Email
 {
@@ -52,11 +53,14 @@ class Email
 	/**
 	 *
 	 */
-	public $date = '';
+	private $date = '';
 
 	public function __construct(GoogleServiceGmailMessage $message, $format = EmailFormatEnum::META_RAW)
 	{
+		$this->format = $format;
+
 		$email = $this->formatGmailMessageToEmail($message);
+		
 		$this->from = $email['from'];
 		$this->to = $email['to'];
 		$this->cc = $email['cc'];
@@ -65,7 +69,19 @@ class Email
 		$this->subject = $email['subject'];
 		$this->snippet = $email['snippet'];
 		$this->body = $email['body'];
-		$this->date = $email['date'];
+
+		$this->setDate(new Carbon($email['date']));
+	}
+
+	public function getDate() : Carbon 
+	{
+		return $this->date;
+	}
+
+	public function setDate(Carbon $date)
+	{	
+		$this->date = $date;
+		return $this;
 	}
 
 	public function __toArray()
