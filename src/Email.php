@@ -60,7 +60,11 @@ class Email
 		$this->format = $format;
 
 		$email = $this->formatGmailMessageToEmail($message);
-		
+
+		if(!$email['from'] || !$email['to'] || !$email['gmessage_id'] || !$email['date']) {
+			throw new GoogleException('No from, to, date, gmessage_id, subject, body fields present.');
+		}
+
 		$this->from = $email['from'];
 		$this->to = $email['to'];
 		$this->cc = $email['cc'];
@@ -125,8 +129,8 @@ class Email
 		$email['gmessage_id'] = $message->getId();
 
 		// if email from is null or no to messages then continue
-    	if(!$email['from']['email'] || !$email['to'] || !$email['date'] || $email['date'] === '00:00:00 00:00:00') {
-    		return ;
+    	if(!$email['from']['email'] || !$email['date'] || $email['date'] === '00:00:00 00:00:00') {
+    		throw new GoogleException('No from email, date fields present.');
     	}
 
     	// saving the snippet
