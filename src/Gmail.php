@@ -155,7 +155,12 @@ class Gmail extends AbstractGoogle
 		}
 
 		foreach ($messagesResponse->getMessages() as $message) {
-			$emails[] = $this->getEmailById($message->getId(), EmailFormatEnum::META_RAW);
+			try {
+				$emails[] = $this->getEmailById($message->getId(), EmailFormatEnum::META_RAW);
+			} catch (GoogleException $e) {
+				// ignore for now
+				continue;
+			}
 
 			$countProcessedEmails ++;
 			if($countProcessedEmails === $params['maxResults']) {
