@@ -38,7 +38,7 @@ class Google
 	/**
 	 * 
 	 */
-	private function __construct($appCredentials = null, $useDomainAccess = false, $sslEnabled = false)
+	private function __construct($appCredentials = null, $useDomainAccess = false, $sslEnabled = true)
 	{
 		if($appCredentials) {
 			$this->setAppCredentials($appCredentials);
@@ -48,20 +48,18 @@ class Google
 			$this->useDomainAccess();
 		}
 
-		if($sslEnabled) {
-			$this->sslEnabled = $sslEnabled;
-		}
+		$this->sslEnabled = $sslEnabled;
 	}
 
-	public static function createForDomainWideAccess($appCredentials, $sslEnabled = false)
+	public static function createForDomainWideAccess($appCredentials, $sslEnabled = true)
 	{
-		$google = new Google($appCredentials, true);
+		$google = new Google($appCredentials, true, $sslEnabled);
 		return $google;
 	}
 
-	public static function createForIndividualAccess($appCredentials, $sslEnabled = false)
+	public static function createForIndividualAccess($appCredentials, $sslEnabled = true)
 	{
-		$google = new Google($appCredentials);
+		$google = new Google($appCredentials, false, $sslEnabled);
 		return $google;
 	}
 
@@ -95,23 +93,15 @@ class Google
 		return $this->sslEnabled;
 	}
 
-	public function createCalendar($userToken, $permissions = [], $sslEnabled = null)
+	public function createCalendar($userToken, $permissions = [])
 	{	
-		if (!$sslEnabled) {
-			$sslEnabled = $this->isSslEnabled();
-		}
-
 		return new Calendar($this->getAppCredentials(), $userToken, $this->domainWideClient, 
-			$permissions, $sslEnabled);
+			$permissions, $this->isSslEnabled());
 	}
 
 	public function createGmail($userToken, $permissions = [], $sslEnabled = false)
 	{
-		if (!$sslEnabled) {
-			$sslEnabled = $this->isSslEnabled();
-		}
-
 		return new Gmail($this->getAppCredentials(), $userToken, $this->domainWideClient, 
-			$permissions, $sslEnabled);
+			$permissions, $this->isSslEnabled());
 	}
 }
