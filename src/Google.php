@@ -85,15 +85,23 @@ class Google
 		return $this->sslEnabled;
 	}
 
-	public function createCalendar($userToken, $permissions = [])
+	public function createCalendar($userToken, $permissions = [], $sslEnabled = null)
 	{	
+		if (!$sslEnabled) {
+			$sslEnabled = $this->isSslEnabled();
+		}
+
 		return new Calendar($this->getAppCredentials(), $userToken, $this->domainWideClient, 
-			$permissions, $this->isSslEnabled());
+			$permissions, $sslEnabled);
 	}
 
-	public function createGmail($userToken, $permissions = [])
+	public function createGmail($userToken, $permissions = [], $sslEnabled = false)
 	{
+		if (!$sslEnabled) {
+			$sslEnabled = $this->isSslEnabled();
+		}
+
 		return new Gmail($this->getAppCredentials(), $userToken, $this->domainWideClient, 
-			$permissions, $this->isSslEnabled());
+			$permissions, $sslEnabled);
 	}
 }
