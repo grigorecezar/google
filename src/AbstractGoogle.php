@@ -74,7 +74,7 @@ abstract class AbstractGoogle
         }
 
         $client->setHttpClient(new \GuzzleHttp\Client(array(
-            'verify' => false,
+            'verify' => $sslEnabled
         )));
         $this->googleClient = $client;
     }
@@ -90,7 +90,7 @@ abstract class AbstractGoogle
         $client->setSubject($userToImpersonate);
 
         $client->setHttpClient(new \GuzzleHttp\Client(array(
-            'verify' => false,
+            'verify' => $sslEnabled
         )));
         $this->googleClient = $client;
     }
