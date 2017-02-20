@@ -34,7 +34,7 @@ abstract class AbstractGoogle
      *
      * @param $permissions are the scopes requested when the authorization takes place
      */
-    public function __construct($appCredentials, $userToken, $domainWide = false, $permissions = [])
+    public function __construct($appCredentials, $userToken, $domainWide = false, $permissions = [], $sslEnabled = false)
     {
         // if a specific set of permissions (scopes in google terms) are being passed
         // then using those otherwise the default child class scope
@@ -45,9 +45,9 @@ abstract class AbstractGoogle
         }
 
         if($domainWide) {
-            $this->setDomainWideClient($userToken, $appCredentials);
+            $this->setDomainWideClient($userToken, $appCredentials, $sslEnabled);
         } else {
-            $this->setGoogleClientIndividualAccess($appCredentials, $userToken);
+            $this->setGoogleClientIndividualAccess($appCredentials, $userToken, $sslEnabled);
         }
 
         $this->setClient();
@@ -58,7 +58,7 @@ abstract class AbstractGoogle
     /**
     * Creates an authorized Gooogle API client using the $userToken passed in constructor
     */
-    private function setGoogleClientIndividualAccess($appCredentials, $userAccessToken)
+    private function setGoogleClientIndividualAccess($appCredentials, $userAccessToken, $sslEnabled)
     {
         $client = new Google_Client();
         $client->setAccessType('offline');
@@ -73,19 +73,25 @@ abstract class AbstractGoogle
             $client->refreshToken($client->getRefreshToken());
         }
 
+        $client->setHttpClient(new \GuzzleHttp\Client(array(
+            'verify' => false,
+        )));
         $this->googleClient = $client;
     }
 
     /**
      *
      */
-    public function setDomainWideClient($userToImpersonate, $googleCredentialsFilePath)
+    public function setDomainWideClient($userToImpersonate, $googleCredentialsFilePath, $sslEnabled)
     {
         $client = new Google_Client();
         $client->setScopes($this->permissions);
         $client->setAuthConfig($googleCredentialsFilePath);
         $client->setSubject($userToImpersonate);
 
+        $client->setHttpClient(new \GuzzleHttp\Client(array(
+            'verify' => false,
+        )));
         $this->googleClient = $client;
     }
 
