@@ -80,6 +80,16 @@ class Google
 		$this->domainWideClient = true;
 	}
 
+	public function enableSsl()
+	{
+		$this->sslEnabled = true;
+	}
+
+	public function disableSsl()
+	{
+		$this->sslEnabled = false;
+	}
+
 	public function isSslEnabled()
 	{
 		return $this->sslEnabled;
