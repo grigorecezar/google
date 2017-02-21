@@ -66,6 +66,10 @@ abstract class AbstractGoogle
 
         $client->setAuthConfig($appCredentials);
 
+        if(!is_array($userAccessToken)){
+            $userAccessToken = (array) $userAccessToken;
+        }
+
         $userAccessToken['expires_in'] = $userAccessToken['expiry_date'] - time() * 1000;
         $client->setAccessToken($userAccessToken);
         
