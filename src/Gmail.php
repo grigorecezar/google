@@ -408,4 +408,14 @@ class Gmail extends AbstractGoogle
 			return null;
 		}
 	}
+
+	public function getEmailDetails($gmessageId)
+	{
+		$message = $this->getClient()->users_messages->get('me', $gmessageId, [
+			'format' => 'FULL',
+			'metadataHeaders' => ['From', 'To', 'Cc', 'Bcc', 'Date']
+		]);
+
+		return $message;
+	}
 }
